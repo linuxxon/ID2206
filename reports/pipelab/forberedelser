@@ -1,0 +1,7 @@
+1) Init
+2) Beror på din definition av att kommunicera. Du kan sätta evnironmentvariabler som kommer finnas i barnprocessen när den skapas men inte efter det.
+3) 
+4) I UNIX hanteras processerna i ett träd. Parent-processen kan vilja göra saker åt/med child-processen, som t.ex. att sätta upp pipes eller dirigera om standard-input/-output. Om parent-processen inte får den skapade processens id kan den inte veta vilken av dess child-processer som är vilken. Child-processen har inte lika ofta användning av sitt eget PID men kan få detta med systemanrop.
+5) Varje process har från början tre fil descriptorer, standard-input/-output/-error, standard-output/-error pekar default till det shell som exekverat programmet. Genom att ha en separat tabell för varje process kan man standardisera dessa till index 0-2 och ha dem peka till samma plats i File Table. På detta sätt får man en bra uppsyn över vilka filer som är öppna i systemet och det behöver bara finnas en file descriptor för varje öppen fil/enhet.
+   Om man istället använder en offset i File Table skulle det behövas en mycket större tabell och när processer tas bort/blir klara kommer det uppstå problem med fragmentering. Även om en process's file deskriptorer skulle öka under körning skulle dessa kunna behöva växa in i en annan process's deskriptorer och orsaka problem
+6) 
