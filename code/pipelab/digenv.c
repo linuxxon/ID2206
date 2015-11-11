@@ -7,7 +7,7 @@
 #include <sys/wait.h> /* wait */
 #include <errno.h> /* errno */
 #include <stdio.h> /* printf */
-#include <stdlib.h> 
+#include <stdlib.h> /* getenv */
 #include <unistd.h> /* fork, exec, pipe, dup */
 
 /* Array indicies for PIDs and pipe fd's */
@@ -141,10 +141,12 @@ int main(int argc, char* argv[])
     /* PID array for childprocesses */
     pid_t pid[2];
 
+    char *pager = getenv("PAGER");
+
     /* Arguments to start processes */
     char *argv1[] = { "printenv", (char ) 0 };
     char *argv2[] = { "sort", (char *) 0 };
-    char *argv3[] = { "less", (char *) 0};
+    char *argv3[] = { pager, (char *) 0};
 
     int io_redir[2];
 
