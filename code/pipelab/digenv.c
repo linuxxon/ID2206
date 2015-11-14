@@ -19,10 +19,149 @@
 #define PIPEOUT     0
 #define PIPEIN      1
 
+/* Function prototypes */
+int  waitChild(int childIndex);
+int  closePipes(int *keep_open);
+void handle_fail(int failedIndex, int grep);
+int  startProcess(char *argv[], pid_t *pid, int *io_redir);
+
+/* Global variables */
 int retval; /* Variable to hold return values */
 
 pid_t pid[3]; /* PID array for childprocesses */
 int pipe_fd[3][2] = { {-1,-1}, {-1,-1}, {-1,-1} }; /* Pipe file descriptors */
+
+/* main - stuff 
+ * 
+ * If more arguments than the path is provided, output should be filtered
+ * through grep. The switch used to invoke grep is therefore  argc > 1
+ */
+int main(int argc, char* argv[])
+{
+    char *pager = getenv("PAGER");
+
+    /* Arguments to start processes */
+    char *argv_env[] = { "printenv", (char ) 0 };
+    char *argv_sort[] = { "sort", (char *) 0 };
+    char *argv_pager[] = { pager, (char *) 0};
+    
+    char **argv_g = argv;
+    argv_g[0] = "grep";
+
+
+    int io_redir[2];
+
+    /* Setup pipes */
+    retval = pipe(pipe_fd[ PRINTENV ]);
+    if (retval == -1)
+    {
+        perror("Could not open pipe");
+        exit(1);
+    }
+
+    retval = pipe(pipe_fd[ SORT ]);
+    if (retval == -1)
+    {
+        perror("Could not open pipe");
+        exit(1);
+    }
+
+    if (argc > 1) /* Filter parameters supplied, feed through grep */
+    {
+        retval = pipe(pipe_fd[ GREP ]);
+        if (retval == -1)
+        {
+            perror("Could not open pipe");
+            exit(1);
+        }
+    }
+
+    /* Run programs default */
+    io_redir[STDIN_FILENO] = -1;
+    io_redir[STDOUT_FILENO] = pipe_fd[PRINTENV][PIPEIN];
+    retval = startProcess(argv_env, &pid[PRINTENV], io_redir);
+    if (retval == -1)
+    {
+        perror("Could not run 'printenv'");
+        exit(4);
+    }
+
+    if (argc > 1) /* Filter parameters supplied, feed through grep */
+    {
+        /* Setup redirection for grep and execute */
+        io_redir[STDIN_FILENO] = pipe_fd[PRINTENV][PIPEOUT];
+        io_redir[STDOUT_FILENO] = pipe_fd[GREP][PIPEIN];
+        retval = startProcess(argv_g, &pid[GREP], io_redir);
+        if(retval == -1)
+        {
+            perror("Could not run 'grep'");
+            exit(4);
+        }
+
+        /* Setup redirection of sort*/
+        io_redir[STDIN_FILENO] = pipe_fd[GREP][PIPEOUT];
+    } 
+    else /* No filter pararameters supplied */
+    {
+        /* Default pipe setup for running w/o filters */
+        io_redir[STDIN_FILENO] = pipe_fd[PRINTENV][PIPEOUT];
+    }
+    io_redir[STDOUT_FILENO] = pipe_fd[SORT][PIPEIN]; /* Output is always the same */
+    retval = startProcess(argv_sort, &pid[SORT], io_redir);
+    if (retval == -1)
+    {
+        perror("Could not run 'sort'");
+        exit(4);
+    }
+
+
+    /* Prepair parent for less */
+    io_redir[0] = pipe_fd[SORT][PIPEOUT]; /* Reuse io_redir for convenience */
+    io_redir[1] = -1;
+    closePipes(io_redir);
+
+    retval = dup2(pipe_fd[SORT][PIPEOUT], STDIN_FILENO);
+    if (retval == -1)
+    {
+        perror("Could not redirect stdin");
+        exit(2);
+    }
+
+
+    /* Wait for children */
+    retval = waitChild(PRINTENV);
+    if (retval != 0)
+    {
+        /* argc == 1 is an indicator to wheter or not grep is running, if argc
+         * == 1 then grep is not running and argument will be 0 matching
+         * 'handle_fail()'s specifications */
+        handle_fail(PRINTENV, argc == 1);
+        exit(6);
+    }
+
+    if (argc > 1)
+    {
+        retval = waitChild(GREP);
+        if (retval != 0)
+        {
+            /* As GREP has already failed, we don't want to kill it in
+             * 'handle_fail' - might not be best semantics with the second arg */
+            handle_fail(GREP, 1);
+            exit(6);
+        }
+    }
+
+    retval = waitChild(SORT);
+    if (retval != 0)
+    {
+        handle_fail(SORT, argc == 1);
+        exit(6);
+    }
+
+    (void) execvp(argv_pager[0], argv_pager);
+
+    return 0;
+}
 
 /* closePipes - Close all open pipes (defined by pipe_fd) except those supplied
  * in parameters
@@ -214,134 +353,3 @@ void handle_fail(int failedIndex, int grep)
     }
 }
 
-/* main - stuff 
- * 
- * If more arguments than the path is provided, output should be filtered
- * through grep. The switch used to invoke grep is therefore  argc > 1
- */
-int main(int argc, char* argv[])
-{
-    char *pager = getenv("PAGER");
-
-    /* Arguments to start processes */
-    char *argv_env[] = { "printenv", (char ) 0 };
-    char *argv_sort[] = { "sort", (char *) 0 };
-    char *argv_pager[] = { pager, (char *) 0};
-    
-    char **argv_g = argv;
-    argv_g[0] = "grep";
-
-
-    int io_redir[2];
-
-    /* Setup pipes */
-    retval = pipe(pipe_fd[ PRINTENV ]);
-    if (retval == -1)
-    {
-        perror("Could not open pipe");
-        exit(1);
-    }
-
-    retval = pipe(pipe_fd[ SORT ]);
-    if (retval == -1)
-    {
-        perror("Could not open pipe");
-        exit(1);
-    }
-
-    if (argc > 1) /* Filter parameters supplied, feed through grep */
-    {
-        retval = pipe(pipe_fd[ GREP ]);
-        if (retval == -1)
-        {
-            perror("Could not open pipe");
-            exit(1);
-        }
-    }
-
-    /* Run programs default */
-    io_redir[STDIN_FILENO] = -1;
-    io_redir[STDOUT_FILENO] = pipe_fd[PRINTENV][PIPEIN];
-    retval = startProcess(argv_env, &pid[PRINTENV], io_redir);
-    if (retval == -1)
-    {
-        perror("Could not run 'printenv'");
-        exit(4);
-    }
-
-    if (argc > 1) /* Filter parameters supplied, feed through grep */
-    {
-        /* Setup redirection for grep and execute */
-        io_redir[STDIN_FILENO] = pipe_fd[PRINTENV][PIPEOUT];
-        io_redir[STDOUT_FILENO] = pipe_fd[GREP][PIPEIN];
-        retval = startProcess(argv_g, &pid[GREP], io_redir);
-        if(retval == -1)
-        {
-            perror("Could not run 'grep'");
-            exit(4);
-        }
-
-        /* Setup redirection of sort*/
-        io_redir[STDIN_FILENO] = pipe_fd[GREP][PIPEOUT];
-    } 
-    else /* No filter pararameters supplied */
-    {
-        /* Default pipe setup for running w/o filters */
-        io_redir[STDIN_FILENO] = pipe_fd[PRINTENV][PIPEOUT];
-    }
-    io_redir[STDOUT_FILENO] = pipe_fd[SORT][PIPEIN]; /* Output is always the same */
-    retval = startProcess(argv_sort, &pid[SORT], io_redir);
-    if (retval == -1)
-    {
-        perror("Could not run 'sort'");
-        exit(4);
-    }
-
-
-    /* Prepair parent for less */
-    io_redir[0] = pipe_fd[SORT][PIPEOUT]; /* Reuse io_redir for convenience */
-    io_redir[1] = -1;
-    closePipes(io_redir);
-
-    retval = dup2(pipe_fd[SORT][PIPEOUT], STDIN_FILENO);
-    if (retval == -1)
-    {
-        perror("Could not redirect stdin");
-        exit(2);
-    }
-
-
-    /* Wait for children */
-    retval = waitChild(PRINTENV);
-    if (retval != 0)
-    {
-        /* argc == 1 is an indicator to wheter or not grep is running, if argc
-         * == 1 then grep is not running and argument will be 0 matching
-         * 'handle_fail()'s specifications */
-        handle_fail(PRINTENV, argc == 1);
-        exit(6);
-    }
-
-    if (argc > 1)
-    {
-        retval = waitChild(GREP);
-        if (retval != 0)
-        {
-            /* As GREP has already failed, we don't want to kill it in
-             * 'handle_fail' - might not be best semantics with the second arg */
-            handle_fail(GREP, 1);
-            exit(6);
-        }
-    }
-
-    retval = waitChild(SORT);
-    if (retval != 0)
-    {
-        handle_fail(SORT, argc == 1);
-        exit(6);
-    }
-
-    (void) execvp(argv_pager[0], argv_pager);
-
-    return 0;
-}
