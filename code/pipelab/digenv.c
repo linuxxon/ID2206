@@ -3,353 +3,227 @@
  * By Rasmus Linusson 10/11-2015
  */
 
-#include <sys/types.h> /* pid_t */
-#include <sys/wait.h> /* wait */
-#include <errno.h> /* errno */
-#include <stdio.h> /* printf */
-#include <stdlib.h> /* getenv */
-#include <unistd.h> /* fork, exec, pipe, dup */
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-/* Array indicies for PIDs and pipe fd's */
-#define PRINTENV    0
-#define SORT        1
-#define GREP        2
-
-/* Array indicies for fd's */
 #define PIPEOUT     0
 #define PIPEIN      1
 
-/* Function prototypes */
-int  waitChild(int childIndex);
-int  closePipes(int *keep_open);
-void handle_fail(int failedIndex, int grep);
-int  startProcess(char *argv[], pid_t *pid, int *io_redir);
+#define PRINTENV    0
+#define GREP        1
+#define SORT        2
+#define PAGER       3
 
-/* Global variables */
-int retval; /* Variable to hold return values */
+int pid[4];
 
-pid_t pid[3]; /* PID array for childprocesses */
-int pipe_fd[3][2] = { {-1,-1}, {-1,-1}, {-1,-1} }; /* Pipe file descriptors */
+void    fork_error();
+void    pipe_error();
+void    run_error(int);
+void    fatal_error(char *);
+int     setup(char**, int, int, int);
 
-/* main - stuff 
- * 
- * If more arguments than the path is provided, output should be filtered
- * through grep. The switch used to invoke grep is therefore  argc > 1
- */
 int main(int argc, char* argv[])
 {
-    char *pager = getenv("PAGER");
+    int pipe;   /* File descriptor for piping output */
 
-    /* Arguments to start processes */
-    char *argv_env[] = { "printenv", (char ) 0 };
-    char *argv_sort[] = { "sort", (char *) 0 };
-    char *argv_pager[] = { pager, (char *) 0};
+    /* reserve pipe for trying pagers and iterator for for-loop */
+    int r_pipe, i;
+
+    /* Number of steps in pipeline */
+    int num_proc = 3;
+    if (argc > 1) ++num_proc;
+
+    char *pager = getenv("PAGER");  /* Get pager from environment */
+
+    if (pager == NULL) pager = "less"; /* If no pager is prefeered, use less */
+
+    /* Arguments for programs to run */
+    char *arg_env[] = { "printenv", (char *) 0 };
+    char **arg_grep = argv;
+    char *arg_sort[] = { "sort", (char *) 0 };
+    char *arg_pager[] = { pager, (char *) 0 };
+
+    /* As grep uses all parameters, just substitute the path */
+    arg_grep[0] = "grep";
+
     
-    char **argv_g = argv;
-    argv_g[0] = "grep";
+    /* Start processes */
+    pipe = setup(arg_env, PRINTENV, -1, 1);
+    if (pipe == -1) pipe_error();
+    if (pipe == -2) fork_error();
 
-
-    int io_redir[2];
-
-    /* Setup pipes */
-    retval = pipe(pipe_fd[ PRINTENV ]);
-    if (retval == -1)
-    {
-        perror("Could not open pipe");
-        exit(1);
-    }
-
-    retval = pipe(pipe_fd[ SORT ]);
-    if (retval == -1)
-    {
-        perror("Could not open pipe");
-        exit(1);
-    }
-
-    if (argc > 1) /* Filter parameters supplied, feed through grep */
-    {
-        retval = pipe(pipe_fd[ GREP ]);
-        if (retval == -1)
-        {
-            perror("Could not open pipe");
-            exit(1);
-        }
-    }
-
-    /* Run programs default */
-    io_redir[STDIN_FILENO] = -1;
-    io_redir[STDOUT_FILENO] = pipe_fd[PRINTENV][PIPEIN];
-    retval = startProcess(argv_env, &pid[PRINTENV], io_redir);
-    if (retval == -1)
-    {
-        perror("Could not run 'printenv'");
-        exit(4);
-    }
-
-    if (argc > 1) /* Filter parameters supplied, feed through grep */
-    {
-        /* Setup redirection for grep and execute */
-        io_redir[STDIN_FILENO] = pipe_fd[PRINTENV][PIPEOUT];
-        io_redir[STDOUT_FILENO] = pipe_fd[GREP][PIPEIN];
-        retval = startProcess(argv_g, &pid[GREP], io_redir);
-        if(retval == -1)
-        {
-            perror("Could not run 'grep'");
-            exit(4);
-        }
-
-        /* Setup redirection of sort*/
-        io_redir[STDIN_FILENO] = pipe_fd[GREP][PIPEOUT];
-    } 
-    else /* No filter pararameters supplied */
-    {
-        /* Default pipe setup for running w/o filters */
-        io_redir[STDIN_FILENO] = pipe_fd[PRINTENV][PIPEOUT];
-    }
-    io_redir[STDOUT_FILENO] = pipe_fd[SORT][PIPEIN]; /* Output is always the same */
-    retval = startProcess(argv_sort, &pid[SORT], io_redir);
-    if (retval == -1)
-    {
-        perror("Could not run 'sort'");
-        exit(4);
-    }
-
-
-    /* Prepair parent for less */
-    io_redir[0] = pipe_fd[SORT][PIPEOUT]; /* Reuse io_redir for convenience */
-    io_redir[1] = -1;
-    closePipes(io_redir);
-
-    retval = dup2(pipe_fd[SORT][PIPEOUT], STDIN_FILENO);
-    if (retval == -1)
-    {
-        perror("Could not redirect stdin");
-        exit(2);
-    }
-
-
-    /* Wait for children */
-    retval = waitChild(PRINTENV);
-    if (retval != 0)
-    {
-        /* argc == 1 is an indicator to wheter or not grep is running, if argc
-         * == 1 then grep is not running and argument will be 0 matching
-         * 'handle_fail()'s specifications */
-        handle_fail(PRINTENV, argc == 1);
-        exit(6);
-    }
-
+    /* If grep should be used - use grep */
     if (argc > 1)
     {
-        retval = waitChild(GREP);
-        if (retval != 0)
-        {
-            /* As GREP has already failed, we don't want to kill it in
-             * 'handle_fail' - might not be best semantics with the second arg */
-            handle_fail(GREP, 1);
-            exit(6);
-        }
+        pipe = setup(arg_grep, GREP, pipe, 1);
+        if (pipe == -1) pipe_error();
+        if (pipe == -2) fork_error();
     }
 
-    retval = waitChild(SORT);
-    if (retval != 0)
+    pipe = setup(arg_sort, SORT, pipe, 1);
+    if (pipe == -1) pipe_error();
+    if (pipe == -2) fork_error();
+
+    /* Start a pager */
+    for (i = 0; i < 3; i++)
     {
-        handle_fail(SORT, argc == 1);
-        exit(6);
-    }
+        /* setup closes pipe, so make a copy incase it fails */
+        r_pipe = pipe;
 
-    (void) execvp(argv_pager[0], argv_pager);
-
-    return 0;
-}
-
-/* closePipes - Close all open pipes (defined by pipe_fd) except those supplied
- * in parameters
- * Parameters:
- *      int *keep_open - array of pipe fd's not to close
- */
-int closePipes(int *keep_open)
-{
-    int i, j, k, remove;
-
-    for (i = 0; i < sizeof(pipe_fd)/sizeof(pipe_fd[0]); i++)
-    {
-        for (j = 0; j < sizeof(pipe_fd[i])/sizeof(int); j++)
+        pipe = setup(arg_pager, PAGER, pipe, 0);
+        if (pipe == -1) pipe_error();
+        if (pipe == -2) 
         {
-            remove = 1; /* If remove == 0 keep file descriptor */
+            pipe = r_pipe;
 
-            for (k = 0; k < sizeof(keep_open)/sizeof(int); k++)
-            {
-                if (pipe_fd[i][j] == keep_open[k] || pipe_fd[i][j] == -1)
-                    remove = 0;
-            }
-
-            if (remove)
-            {
-                retval = close(pipe_fd[i][j]);
-                if (retval == -1)
-                {
-                    perror("Could not close pipe");
-                    exit(2);
-                }
-            }
-        }
-    }
-    return 0;
-}
-
-
-/* startProcess - Fork process and execute program
- * Parameters:
- *      char *argv[] - argument vector to pass onto program
- *      pid_t *pid - pointer to pid
- *      int io_redir[2] - Pipe file descriptors to redirect.
- *                      Value = -1 - Do nothing
- *                      Index 0 - Redirect stdout
- *                      Index 1 - Redirect stdin
- */
-int startProcess(char *argv[], pid_t *pid, int *io_redir)
-{
-    *pid = fork();
-    if (*pid == 0) /* Child process */
-    {
-        /* Setup pipes */
-        if (io_redir[PIPEOUT] != -1)
-        {
-            retval = dup2(io_redir[PIPEOUT], STDIN_FILENO);
-            if (retval == -1)
-            {
-                perror("Could not redirect stdin");
-                exit(1);
-            }
-        }
-        if (io_redir[PIPEIN] != -1)
-        {
-            retval = dup2(io_redir[PIPEIN], STDOUT_FILENO);
-            if (retval == -1)
-            {
-                perror("Could not redirect stdout");
-                exit(1);
-            }
-        }
-
-        
-        /* Close unused pipe file descriptor for this process */
-        closePipes(io_redir);
-
-        /* Execute new program */
-        (void) execvp(argv[0], argv);
-        return -1;
-    }
-    if (*pid == -1)
-        return -1;
-    return 0;
-}
-
-/* waitChild - Wait for a child process to stop executing and report any
- * problems to stderr
- *
- * Parameters:
- *      int childIndex - Index to child pid in pid array. If < 0 wait for any
- *      process, if >= arraysize wait for any pid
- *
- * Return value:
- *      0  - Process terminated sucessfully
- *      <0 - Process terminated by signal or wait failed
- *      -255 - wait system call failed
- *      >0 - Process terminated with error code
- */
-int waitChild(int childIndex)
-{
-    int status;
-    pid_t childpid;
-
-    childpid = waitpid(pid[childIndex], &status, 0);
-    if (childpid == -1)
-    {
-        perror("wait() failed unexpecedly");
-        return -255;
-    }
-    else if (WIFEXITED(status)) /* One child is done executing */
-    {
-        int child_status = WEXITSTATUS(status);
-        if (child_status != 0) /* Child had problems */
-        {
-            /* If grep failed, leave a more informing message */
-            if (childpid == pid[GREP])
-            {
-                fprintf(stderr, "\nCommand arguments caused grep to fail, please "
-                                "check your syntax\n");
-            }
+            if (i == 0)
+                arg_pager[0] = "less";
+            else if (i == 1)
+                arg_pager[0] = "more";
             else
-                fprintf(stderr, "Child (pid %ld) failed with exit code %d\n",
-                        (long int) childpid, child_status);
+                fatal_error("No pager available"); /* Could not start a pager */
         }
 
-        /* Return a value that adheres to the specification */
-        return child_status > 0 ? child_status : child_status * -1;
+        break;
     }
-    else if (WIFSIGNALED(status)) /* Child process was aborted by a signal */
+
+    for (i = 0; i < num_proc; i++)
     {
-        int child_signal = WTERMSIG(status);
-        fprintf(stderr, "Child (pid %ld) was terminadet by signal no. %d\n",
-                (long int) childpid, child_signal);
+        int childpid, status;
 
-        return child_signal * -1; /*Invert return value to adhere to specification*/
+        childpid = wait(&status);
+        if (WEXITSTATUS(status) != 0) run_error(childpid);
     }
 
-    return -255; /* Somethings wrong if function does not return before this */
+    return 0;
 }
 
-/* handle_fail - If a process failed, kill the others
- *
- * Parameters:
- *      int failedIndex - Index of faild process in pid array
- *      int grep - != 0 if grep is also running
- */
-void handle_fail(int failedIndex, int grep)
+/* Error while forking occured */
+void fork_error()
 {
-    /* Something happened, error has been printed to stderr so just handle
-     * it - kill printenv, grep and  sort if running */
-    int status;
+    fatal_error("Error creating new fork");
+}
 
-    retval = waitpid(pid[PRINTENV], &status, WNOHANG); 
-    if (retval == 0)
-    {
-        /* Sort is still running */
-        retval = kill(pid[PRINTENV], 9);
-        if (retval == -1)
-        {
-            perror("Can't send kill-signal");
-            exit(5);
-        }
-    }
+/* If error happend with a pipe, print and shut down */
+void pipe_error()
+{
+    fatal_error("Could not open/dup/close pipe");
+}
 
-    if (grep)
+void run_error(int error_pid)
+{
+    if (error_pid == pid[PRINTENV])
+        fatal_error("printenv failed");
+    if (error_pid == pid[GREP])
+        fatal_error("grep failed");
+    if (error_pid == pid[SORT])
+        fatal_error("sort failed");
+    if (error_pid == pid[PAGER])
+        fatal_error("pager failed");
+}
+
+/* Fatal error, kill all children and terminate */
+void fatal_error(char *error)
+{
+    int i;
+
+    fprintf(stderr, "Fatal error occured: %s\n", error);
+
+    for (i = 0; i < sizeof(pid)/sizeof(pid[0]); i++)
     {
-        retval= waitpid(pid[GREP], &status, WNOHANG); 
+        int status, retval;
+
+        retval = waitpid(pid[i], &status, WNOHANG);
         if (retval == 0)
         {
-            /* Sort is still running */
-            retval = kill(pid[GREP], 9);
-            if (retval == -1)
-            {
-                perror("Can't send kill-signal");
-                exit(5);
-            }
+            /* Process is still running */
+            kill(pid[i], 9);
         }
     }
 
-    retval = waitpid(pid[SORT], &status, WNOHANG); 
-    if (retval == 0)
-    {
-        /* Sort is still running */
-        retval = kill(pid[SORT], 9);
-        if (retval == -1)
-        {
-            perror("Can't send kill-signal");
-            exit(5);
-        }
-    }
+    exit(1);
 }
 
+/*
+ * pipe_in, any redirect to stdin
+ * pipe_in, do you want to redir stdout?, 0 - no, else yes
+ * returns outpipe */
+int setup(char **argv, int program_index, int pipe_in, int pipe_out)
+{
+    int retval;
+    int pipe_fd[2] = { -1, -1 };
+
+    /* Open new pipe if needed */
+    if (pipe_out != 0)
+    {
+        retval = pipe(pipe_fd);
+        if (retval == -1) pipe_error();
+    }
+    
+    /* Fork and execute */
+    pid[program_index] = fork();
+    if (pid[program_index] == 0) /* Child */
+    {
+        /* Redir pipe_in to stdin */
+        if (pipe_in > 0)
+        {
+            retval = dup2(pipe_in, STDIN_FILENO);
+            if (retval == -1) pipe_error();
+
+            if (pipe_in > 2)
+            {
+                retval = close(pipe_in);
+                if (retval == -1) pipe_error();
+            }
+        }
+
+        /* Redir stdout to return value of function */
+        if (pipe_out != 0)
+        {
+            /* Open pipe for output */
+            retval = dup2(pipe_fd[PIPEIN], STDOUT_FILENO);
+            if (retval == -1) pipe_error();
+
+            retval = close(pipe_fd[PIPEIN]);
+            if (retval == -1) pipe_error();
+
+            retval = close(pipe_fd[PIPEOUT]);
+            if (retval == -1) pipe_error();
+        }
+
+        (void) execvp(argv[0], argv);
+
+        /* If program could not be found */
+        if (errno == ENOENT) exit(200);
+    }
+    if (pid[program_index] == -1)
+    {
+        if (pipe_in > 2)
+        {
+            retval = close(pipe_in);
+            if (retval == -1) pipe_error();
+        }
+
+        return -2;
+    }
+
+    /* Close pipes opened */
+    if (pipe_out != 0)
+    {
+        retval = close(pipe_fd[PIPEIN]);
+        if (retval == -1) pipe_error();
+    }
+
+    /* If pipe to process was provided, close it. 2 Because we don't close std */
+    if (pipe_in > 2)
+    {
+        retval = close(pipe_in);
+        if (retval == -1) pipe_error();
+    }
+
+    return pipe_fd[PIPEOUT] != -1 ? pipe_fd[PIPEOUT] : 0;
+}
