@@ -30,8 +30,8 @@ int main(int argc, char* argv[])
 {
     int pipe;   /* File descriptor for piping output */
 
-    /* reserve pipe for trying pagers and iterator for for-loop */
-    int r_pipe, i;
+    /* iterator for for-loop */
+    int i;
 
     /* Number of steps in pipeline */
     int num_proc = 3;
@@ -69,34 +69,25 @@ int main(int argc, char* argv[])
     if (pipe == -2) fork_error();
 
     /* Start a pager */
-    for (i = 0; i < 3; i++)
-    {
-        /* setup closes pipe, so make a copy incase it fails */
-        r_pipe = pipe;
+    pipe = setup(arg_pager, PAGER, pipe, 0);
+    if (pipe == -1) pipe_error();
+    if (pipe == -2) fork_error();
 
-        pipe = setup(arg_pager, PAGER, pipe, 0);
-        if (pipe == -1) pipe_error();
-        if (pipe == -2) 
-        {
-            pipe = r_pipe;
-
-            if (i == 0)
-                arg_pager[0] = "less";
-            else if (i == 1)
-                arg_pager[0] = "more";
-            else
-                fatal_error("No pager available"); /* Could not start a pager */
-        }
-
-        break;
-    }
-
+    /* Wait for all processes to exit */
     for (i = 0; i < num_proc; i++)
     {
         int childpid, status;
 
         childpid = wait(&status);
-        if (WEXITSTATUS(status) != 0) run_error(childpid);
+        if (WIFEXITED(status))
+        {
+            if (childpid == pid[GREP] && WEXITSTATUS(status) == 1)
+            { /* No results, not a problem */ }
+            else if (WEXITSTATUS(status) != 0)
+                run_error(childpid);
+        }
+        else
+            i--; /* Child changed state but didn't exit */
     }
 
     return 0;
@@ -114,6 +105,7 @@ void pipe_error()
     fatal_error("Could not open/dup/close pipe");
 }
 
+/* Error in some stage of the pipeline, retreat */
 void run_error(int error_pid)
 {
     if (error_pid == pid[PRINTENV])
@@ -141,7 +133,10 @@ void fatal_error(char *error)
         if (retval == 0)
         {
             /* Process is still running */
-            kill(pid[i], 9);
+/*            if (i == PAGER)
+                kill(pid[i], 15);
+            else
+*/                kill(pid[i], 9);
         }
     }
 
@@ -197,8 +192,15 @@ int setup(char **argv, int program_index, int pipe_in, int pipe_out)
 
         (void) execvp(argv[0], argv);
 
-        /* If program could not be found */
-        if (errno == ENOENT) exit(200);
+        if (program_index == PAGER) /* Failed to start pager, try default ones */
+        {
+            execlp("less", "less", (char *) 0);
+
+            /* If less failed, try more, if more fails, give up */
+            execlp("more", "more", (char *) 0);
+        }
+
+        exit(200);
     }
     if (pid[program_index] == -1)
     {
