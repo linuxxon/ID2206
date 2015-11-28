@@ -86,6 +86,8 @@ int main(int argc, char* argv[])
             else if (WEXITSTATUS(status) != 0)
                 run_error(childpid);
         }
+        else if (WIFSIGNALED(status))
+            run_error(childpid);
         else
             i--; /* Child changed state but didn't exit */
     }
