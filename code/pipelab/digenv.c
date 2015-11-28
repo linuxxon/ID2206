@@ -25,10 +25,12 @@ void    pipe_error();
 void    run_error(int);
 void    fatal_error(char *);
 int     setup(char**, int, int, int);
+void    handle_exit(int childpid, int status);
 
 int main(int argc, char* argv[])
 {
     int pipe;   /* File descriptor for piping output */
+    int childpid, status;
 
     /* iterator for for-loop */
     int i;
@@ -68,31 +70,56 @@ int main(int argc, char* argv[])
     if (pipe == -1) pipe_error();
     if (pipe == -2) fork_error();
 
+    if (argc > 1)
+    {
+        /* Wait for grep to finish before starting the pager, this because we don't
+         * want to kill the pager as it will not let go of the screen space */
+        do
+        {
+            childpid = waitpid(pid[GREP], &status, 0);
+        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+        handle_exit(childpid, status);
+
+        /* As grpe has already exited, decrement the number of processes to
+         * wait on */
+        num_proc--;
+    }
+
+
     /* Start a pager */
     pipe = setup(arg_pager, PAGER, pipe, 0);
     if (pipe == -1) pipe_error();
     if (pipe == -2) fork_error();
 
-    /* Wait for all processes to exit */
+    /* Wait for all processes to exit, except for grep */
     for (i = 0; i < num_proc; i++)
     {
-        int childpid, status;
-
         childpid = wait(&status);
-        if (WIFEXITED(status))
-        {
-            if (childpid == pid[GREP] && WEXITSTATUS(status) == 1)
-            { /* No results, not a problem */ }
-            else if (WEXITSTATUS(status) != 0)
-                run_error(childpid);
-        }
-        else if (WIFSIGNALED(status))
-            run_error(childpid);
+        if (!WIFEXITED(status) || !WIFSIGNALED(status))
+            handle_exit(childpid, status);
         else
             i--; /* Child changed state but didn't exit */
     }
 
     return 0;
+}
+
+/* hande_exit - Check exit values to see if they are okay
+ * Parameters:
+ *      int childpid - pid of the child that wait returned
+ *      int status - the status as set by wait
+*/
+void handle_exit(int childpid, int status)
+{
+    if (WIFEXITED(status))
+    {
+        if (childpid == pid[GREP] && WEXITSTATUS(status) == 1)
+        { /* No results, not a problem */ }
+        else if (WEXITSTATUS(status) != 0)
+            run_error(childpid);
+    }
+    else if (WIFSIGNALED(status))
+        run_error(childpid);
 }
 
 /* Error while forking occured */
