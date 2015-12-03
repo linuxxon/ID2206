@@ -6,14 +6,14 @@
 
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 
-/* Define limits of background prcs */
-#define MAX_BACKGROUND_PROCS 20
+#include "digenv.h"
 
 /* Define limits of command line */
 #define MAX_LENGTH 71
@@ -30,6 +30,10 @@
 #define PIPEERROR -2
 #define FORKERROR -3
 
+typedef struct timeval s_time;
+
+void print_promt();
+
 int run_program(char**);
 int run_program_block(char**);
 int parse_command(char *, char**);
@@ -38,26 +42,80 @@ int run_builtin(char **);
 int background(char**);
 int check_background_procs();
 
-char *BUILTINS[] = { "exit", "cd" };
+char *BUILTINS[] = { "exit", "cd", "digenv" };
 char *USER;
 
+/* signal_handler - Handler for all your signal needs
+ * Parameters:
+ *      int signal - Number of the signal that was cought
+ */
+void signal_handler(int signal)
+{
+    if (signal == SIGINT)
+    {
+        printf("\n");
+        print_promt();
+        fflush(stdout);
+    }
+    else if (signal == SIGCHLD) /* Notification that a child has terminated */
+    {
+        check_background_procs();
+        fflush(stdout);
+    }
+}
+
+/* register_signals - Register proper signals to be handled by the signal
+ * handler */
+void register_signals()
+{
+    if (signal(SIGINT, signal_handler) == SIG_ERR)
+        fprintf(stderr, "Can't register signal handler\n");
+
+#ifdef SIGNALDETECTION
+    if (signal(SIGCHLD, signal_handler) == SIG_ERR)
+        fprintf(stderr, "Can't register signal handler\n");
+#endif
+}
+
+/* print_promt - Print the shell prompt */
+void print_promt()
+{
+    printf("[%s]$ ", USER);
+}
+
+/* main - Start of shell, doesn't care for arguments */
 int main(int argc, char* argv[])
 {
     int retval;
 
     char cmd_line[MAX_LENGTH];
+    /* Allocate memory for argument vector */
     char **args = (char **) malloc(MAX_ARGS * sizeof(char*));
 
+    /* Register proper signals to handle */
+    register_signals();
+
+    /* Set string for promt */
     USER = getenv("USER");
 
+    /* Main loop */
     while (1)
     {
-        /* Check if any background processes has exited */
-        check_background_procs();
-        printf("[%s]$ ", USER);
 
+#ifndef SIGNALDETECTION
+        /* Check if any background processes has exited */
+        retval = check_background_procs();
+        if (retval == -1 && errno != ECHILD)
+            perror("wait failed");
+#endif
+
+        /* Print a new promt */
+        print_promt();
+
+        /* Fetch new command from terminal */
         if (fgets(cmd_line, MAX_LENGTH, stdin) != NULL) /* Success */
         {
+            /* Parse user command */
             retval = parse_command(cmd_line, args);
 
             if (retval == 1) /* Empty cmd */
@@ -74,7 +132,8 @@ int main(int argc, char* argv[])
             }
             else /* Run a command */
             {
-                if (background(args)) /* Run in the background */
+                /* Run in the background */
+                if (background(args))
                 {
                     run_program(args);
                 }
@@ -123,36 +182,49 @@ int run_program(char **argv)
     if (pid == -1)
         return FORKERROR;
 
+    fprintf(stderr, "Started %s with pid %i\n", argv[0], pid);
+
     return pid;
 }
 
 /* run_program_block - Run a program according to an argument vector, blocking until
- * return
+ * return 
  * Arguments:
  *      char **argv - argumentvector as usual, first element is the path to the
- *      program to be run
+ *      program to be executed
  * Returns:
  *      int - exit status of program run. Negative returns are errors, positive
  *          are return values of program
  */
 int run_program_block(char **argv)
 {
-    int status;
+    int retval, status, pid;
 
-    int pid = fork();
-    if (pid == 0) /* Child */
-    {
-        (void) execvp(argv[0], argv);
-        exit(255);
-    }
-    if (pid == -1) /* Parent */
-        return FORKERROR;
+    s_time start, end;
+    time_t run_time;
+
+    retval = gettimeofday(&start, NULL);
+    pid = run_program(argv);
+
+
+    /* Check retval after forking as not to skew results */
+    if (retval == -1)
+        fprintf(stderr, "Could not get time of day\n");
 
     /* Wait until child has exited */
     do 
         waitpid(pid, &status, 0);
     while (!WIFEXITED(status) && !WIFSIGNALED(status));
+    retval = gettimeofday(&end, NULL);
+    if (retval == -1)
+        fprintf(stderr, "Could not get time of day\n");
 
+    /* Calculate elapsed time in milliseconds */
+    run_time = end.tv_sec*1e6+end.tv_usec - start.tv_sec*1e6 + start.tv_usec;
+    run_time /= 1e3;
+
+    fprintf(stderr, "Pid %d finished executing after %li ms\n", pid, run_time);
+    
     return 255 == WEXITSTATUS(status) ? INVALIDARGS : WEXITSTATUS(status);
 }
 
@@ -227,7 +299,7 @@ int builtin(char **args)
     return 0;
 }
 
-/* background - Check if program chould run as a background process
+/* background - Check if program should run as a background process
  * Parameters:
  *      char **args - Array of pointers to program arguments
  *
@@ -290,7 +362,7 @@ int run_builtin(char **args)
     int retval;
 
     if (strcmp(args[0], "exit") == 0)
-        return 1;
+        return B_EXIT;
     else if (strcmp(args[0], "cd") == 0)
     {
         if (args[1] == NULL)
@@ -307,6 +379,22 @@ int run_builtin(char **args)
             return 0;
         }
         return -1;
+    }
+    else if (strcmp(args[0], "digenv") == 0)
+    {
+        int num_args, i;
+        num_args = MAX_ARGS-1;
+        for (i = 0; i < MAX_ARGS; i++)
+        {
+            if (args[i] == NULL)
+            {
+                num_args = i;
+                break;
+            }
+        }
+
+        /* Call digenv */
+        return digenv(num_args, args);
     }
     return -1;
 }
