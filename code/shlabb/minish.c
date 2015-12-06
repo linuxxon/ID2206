@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 
 #include "digenv.h"
 
@@ -68,13 +69,18 @@ void signal_handler(int signal)
  * handler */
 void register_signals()
 {
-    if (signal(SIGINT, signal_handler) == SIG_ERR)
-        fprintf(stderr, "Can't register signal handler\n");
+    struct sigaction sig;
+    sig.sa_handler = signal_handler;
+    sigfillset(&sig.sa_mask);
+
+    if (sigaction(SIGINT, &sig, NULL) == -1)
+        perror("Can't register signal");
 
 #ifdef SIGNALDETECTION
-    if (signal(SIGCHLD, signal_handler) == SIG_ERR)
-        fprintf(stderr, "Can't register signal handler\n");
+    if (retval = sigaction(SIGCHLD, &sig, NULL) == -1)
+        perror("Can't register signal");
 #endif
+
 }
 
 /* print_promt - Print the shell prompt */
@@ -126,7 +132,16 @@ int main(int argc, char* argv[])
             {
                 retval = run_builtin(args);
                 if (retval == B_EXIT) /* EXIT */
-                    break;
+                {
+                    retval = check_background_procs();
+                    /* retval == 0 means no error for having no children were
+                     * returned */
+                    if (retval == 0)
+                        fprintf(stderr, "Background processes are still running,"\
+                                        "close them before exiting!\n");
+                    else
+                        break;
+                }
                 else if (retval == B_FALIURE) /* Something went wrong */
                     fprintf(stderr, "Command, %s, could not be executed\n", args[0]);
             }
@@ -152,8 +167,6 @@ int main(int argc, char* argv[])
                 }
             }
         }
-        else
-            perror("Failed to read terminal input");
     }
 
     /* Free memmory */
@@ -251,7 +264,8 @@ int parse_command(char *command_line, char **args)
     /* Remove character thurst upon the return key */
     token = "\n";
     retval = strtok(command_line, token);
-    retval = "\0";
+    if (retval)
+        retval = "\0";
     token = " ";
 
     if (strlen(command_line) == 1)
@@ -408,8 +422,8 @@ int check_background_procs()
 
     while ((pid = waitpid(-1, &status, WNOHANG)) != 0)
     {
-        if (pid == -1) /* Error */
-            return -1;
+        if (pid <= -1) /* Error */
+            return pid;
         else /* A process has changed status */
         {
             /* Only do prints if process terminated */
@@ -426,5 +440,5 @@ int check_background_procs()
             num++;
         }
     }
-    return num;
+    return pid < 0 ? pid : num;
 }

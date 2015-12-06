@@ -3,9 +3,9 @@
 OUTPUT = minish
 OBJS = minish.o digenv.o
 CC   = gcc
-CFLAGS = -c
+CFLAGS = -c -std=c99 -D_POSIX_C_SOURCE
 LFLAGS = 
-PREPROC = 
+PREPROC =
 
 .PHONY : all sigdet
 
