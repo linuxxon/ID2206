@@ -70,6 +70,8 @@ void signal_handler(int signal)
  * handler */
 void register_signals()
 {
+    int retval;
+
     struct sigaction sig;
     sig.sa_handler = signal_handler;
     sigfillset(&sig.sa_mask);
