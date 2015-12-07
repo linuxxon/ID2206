@@ -30,6 +30,7 @@
 #define INVALIDARGS -1
 #define PIPEERROR -2
 #define FORKERROR -3
+#define NOPROGRAM 255
 
 typedef struct timeval s_time;
 
@@ -136,11 +137,12 @@ int main(int argc, char* argv[])
                     retval = check_background_procs();
                     /* retval == 0 means no error for having no children were
                      * returned */
+
+                    /* Kill all child processes */
                     if (retval == 0)
-                        fprintf(stderr, "Background processes are still running,"\
-                                        "close them before exiting!\n");
-                    else
-                        break;
+                        retval = kill(-getpid(), SIGKILL);
+
+                    break; /* Breaks main loop and exits */
                 }
                 else if (retval == B_FALIURE) /* Something went wrong */
                     fprintf(stderr, "Command, %s, could not be executed\n", args[0]);
@@ -430,7 +432,10 @@ int check_background_procs()
             if (WIFEXITED(status))
             {
                 int exit_status = WEXITSTATUS(status);
-                printf("Process %d has exited with status %d\n", pid, exit_status);
+                if (exit_status == NOPROGRAM)
+                    printf("Process %d could not run program\n", pid);
+                else
+                    printf("Process %d has exited with status %d\n", pid, exit_status);
             }
             else if (WIFSIGNALED(status))
             {
