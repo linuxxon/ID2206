@@ -34,7 +34,7 @@
 
 typedef struct timeval s_time;
 
-void print_promt();
+void print_prompt();
 
 int run_program(char**, int);
 int run_program_block(char**);
@@ -53,15 +53,22 @@ char *USER;
  */
 void signal_handler(int signal)
 {
+    int retval;
+
     if (signal == SIGINT)
     {
         printf("\n");
-        print_promt();
+        print_prompt();
         fflush(stdout);
     }
     else if (signal == SIGCHLD) /* Notification that a child has terminated */
     {
-        check_background_procs();
+        retval = check_background_procs();
+        if (retval > 0)
+        {
+            printf("\n");
+            print_prompt();
+        }
         fflush(stdout);
     }
 }
@@ -82,14 +89,12 @@ void register_signals()
 #ifdef SIGNALDETECTION
     if (retval = sigaction(SIGCHLD, &sig, NULL) == -1)
         perror("Can't register signal");
-    else
-        fprintf(stderr, "Registered handler for childsignals\n");
 #endif
 
 }
 
-/* print_promt - Print the shell prompt */
-void print_promt()
+/* print_prompt - Print the shell prompt */
+void print_prompt()
 {
     printf("[%s]$ ", USER);
 }
@@ -121,7 +126,7 @@ int main(int argc, char* argv[])
 #endif
 
         /* Print a new promt */
-        print_promt();
+        print_prompt();
 
         /* Fetch new command from terminal */
         if (fgets(cmd_line, MAX_LENGTH, stdin) != NULL) /* Success */
