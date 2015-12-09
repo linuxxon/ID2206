@@ -3,7 +3,7 @@
 OUTPUT = minish
 OBJS = minish.o digenv.o
 CC   = gcc
-CFLAGS = -c -std=c99 -D_POSIX_C_SOURCE
+CFLAGS = -c -std=c99 -D_POSIX_C_SOURCE=199309L
 LFLAGS = 
 PREPROC =
 

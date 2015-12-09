@@ -51,7 +51,7 @@ char *USER;
  * Parameters:
  *      int signal - Number of the signal that was cought
  */
-void signal_handler(int signal)
+void signal_handler(int signal, siginfo_t* info, void* context)
 {
     int retval;
 
@@ -61,13 +61,12 @@ void signal_handler(int signal)
         print_prompt();
         fflush(stdout);
     }
-    else if (signal == SIGCHLD) /* Notification that a child has terminated */
+    else if (signal == SIGCHLD) /* Notification a child changed status*/
     {
-        retval = check_background_procs();
-        if (retval > 0)
+        if (info->si_code == CLD_EXITED)
         {
-            printf("\n");
-            print_prompt();
+            printf("#[SATS]# Process %d exited with value/killed with signal %d\n",
+                    info->si_pid, info->si_status);
         }
         fflush(stdout);
     }
@@ -80,7 +79,8 @@ void register_signals()
     int retval;
 
     struct sigaction sig;
-    sig.sa_handler = signal_handler;
+    sig.sa_sigaction = signal_handler;
+    sig.sa_flags = SA_SIGINFO | SA_NOCLDSTOP | SA_NOCLDWAIT;
     sigfillset(&sig.sa_mask);
 
     if (sigaction(SIGINT, &sig, NULL) == -1)
@@ -211,7 +211,7 @@ int run_program(char **argv, int ignore_int)
     if (pid == -1)
         return FORKERROR;
 
-    fprintf(stderr, "Started %s with pid %i\n", argv[0], pid);
+    printf("#[STAT]# Started %s with pid %i\n", argv[0], pid);
 
     return pid;
 }
@@ -252,7 +252,7 @@ int run_program_block(char **argv)
     run_time = end.tv_sec*1e6+end.tv_usec - start.tv_sec*1e6 + start.tv_usec;
     run_time /= 1e3;
 
-    fprintf(stderr, "Pid %d finished executing after %li ms\n", pid, run_time);
+    printf("#[STAT]# Pid %d stopped executing after %li ms\n", pid, run_time);
     
     return 255 == WEXITSTATUS(status) ? INVALIDARGS : WEXITSTATUS(status);
 }
@@ -447,14 +447,14 @@ int check_background_procs()
             {
                 int exit_status = WEXITSTATUS(status);
                 if (exit_status == NOPROGRAM)
-                    printf("Process %d could not run program\n", pid);
+                    printf("#[STAT]# Process %d could not run program\n", pid);
                 else
-                    printf("Process %d has exited with status %d\n", pid, exit_status);
+                    printf("#[STAT]# Process %d has exited with status %d\n", pid, exit_status);
             }
             else if (WIFSIGNALED(status))
             {
                 int signal = WTERMSIG(status);
-                printf("Process %d was terminated by signal %d\n", pid, signal);
+                printf("#[STAT]# Process %d was terminated by signal %d\n", pid, signal);
             }
             num++;
         }
