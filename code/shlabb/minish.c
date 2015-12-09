@@ -36,7 +36,7 @@ typedef struct timeval s_time;
 
 void print_promt();
 
-int run_program(char**);
+int run_program(char**, int);
 int run_program_block(char**);
 int parse_command(char *, char**);
 int builtin(char **);
@@ -82,6 +82,8 @@ void register_signals()
 #ifdef SIGNALDETECTION
     if (retval = sigaction(SIGCHLD, &sig, NULL) == -1)
         perror("Can't register signal");
+    else
+        fprintf(stderr, "Registered handler for childsignals\n");
 #endif
 
 }
@@ -154,7 +156,7 @@ int main(int argc, char* argv[])
                 /* Run in the background */
                 if (background(args))
                 {
-                    run_program(args);
+                    run_program(args, 1);
                 }
                 else /* Run blocking */
                 {
@@ -183,16 +185,21 @@ int main(int argc, char* argv[])
  * to the started process. (NON BLOCKING)
  * Parameters:
  *      char **argv - argument vector. First element is path of program
+ *      int ignore_int - switch for ignoring SIGINT, used for forground
+ *                      processes
  *
  * Returns:
  *      int > 0 - Pid of new process running command
  *      int < 0 - Errors regarding executing the command
  */
-int run_program(char **argv)
+int run_program(char **argv, int ignore_int)
 {
     int pid = fork();
     if (pid == 0) /* Child */
     {
+        if (ignore_int)
+            signal(SIGINT, SIG_IGN);
+
         (void) execvp(argv[0], argv);
         exit(255);
     }
@@ -221,7 +228,7 @@ int run_program_block(char **argv)
     time_t run_time;
 
     retval = gettimeofday(&start, NULL);
-    pid = run_program(argv);
+    pid = run_program(argv, 0);
 
 
     /* Check retval after forking as not to skew results */
