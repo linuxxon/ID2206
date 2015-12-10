@@ -1,7 +1,10 @@
 /* minish - MiniShell
  * Minimal shell program for course ID2206 at KTH
+ *
+ * Three builtins: exit, cd and digenv
+ *
  * By Rasmus Linusson
- * Date: 26/11-2015
+ * Date: 09/12-2015
  */
 
 #include <sys/types.h>
@@ -50,6 +53,8 @@ char *USER;
 /* signal_handler - Handler for all your signal needs
  * Parameters:
  *      int signal - Number of the signal that was cought
+ *      siginfo_t* info - Struct with information of the signal
+ *      void* contect - Not used
  */
 void signal_handler(int signal, siginfo_t* info, void* context)
 {
