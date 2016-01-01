@@ -21,7 +21,7 @@ int main(int argc, char *argv[]){
     progname = "";
 
   MESSAGE("-- This test will search for memory leaks\n");
-  MESSAGE("At most 3.0x pages are allocated and recycled\n");
+  MESSAGE("At most 4.0x pages are allocated and recycled\n");
 
 #ifdef MMAP
   lowbreak = endHeap();
