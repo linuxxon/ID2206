@@ -4,11 +4,13 @@ SRC	= malloc.h malloc.c tstalgorithms.c  tstcrash_complex.c tstcrash_simple.c \
 OBJ	= malloc.o tstalgorithms.o  tstcrash_simple.o\
 	  tstextreme.o tstmalloc.o  tstmemory.o tstrealloc.o tstmerge.o
 
-BIN	= t0 t1 t2 t3 t4 t5 t6 t7
+BIN	= t0 t1 t2 t3 t4 t5
 
-CFLAGS	= -g -Wall -ansi -DSTRATEGY=2
+STRATEGY ?= 0
+STRAT = -DSTRATEGY=$(STRATEGY)
+CFLAGS	= -g -Wall -ansi $(STRAT)
 
-XFLAGS	= -g -Wall -DSTRATEGY=2
+XFLAGS	= -g -Wall $(STRAT)
 
 #CC	= gcc -ansi -pedantic -Wall -g -pipe -O -pg
 CC	= gcc 
