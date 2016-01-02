@@ -292,6 +292,9 @@ void * malloc(size_t nbytes)
         bases[index] = p->s.ptr;
         return (void *)(p+1);
     }
+    else if (index < NRQUICKLISTS-1)
+        return get_memory(nunits);
+
     /* Otherwise use regular first fit on free list */
 #endif
 
