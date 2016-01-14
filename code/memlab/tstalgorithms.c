@@ -86,7 +86,7 @@ int main(int argc, char *argv[])
 	MESSAGE("* ERROR: malloc returned NULL on non-zero size request\n");
 	  }
       else if( memPosts[i].ptr != NULL )
-	memPosts[i].ptr[0]  = (double)3.14;
+        memPosts[i].ptr[0]  = (double)3.14;
   }
   
   calcMemUsage(&maxMem);

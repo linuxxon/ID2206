@@ -157,7 +157,7 @@ void free(void * ap)
         return;
     }
 
-    /* Mere free blocks of memory */
+    /* Merge free blocks of memory */
     if(bp + bp->s.size == p->s.ptr) {                     /* join to upper nb */
         bp->s.size += p->s.ptr->s.size;
         bp->s.ptr = p->s.ptr->s.ptr;
@@ -293,7 +293,11 @@ void * malloc(size_t nbytes)
         return (void *)(p+1);
     }
     else if (index < NRQUICKLISTS-1)
-        return get_memory(nunits);
+    {
+        nbytes = POW2( (index+FIRST_QLIST) );
+        unsigned aligned_nunits = (nbytes+sizeof(Header)-1)/sizeof(Header) + 1;
+        return get_memory(aligned_nunits);
+    }
 
     /* Otherwise use regular first fit on free list */
 #endif
@@ -343,6 +347,7 @@ void * malloc(size_t nbytes)
     {
         if (p->s.size >= nunits) /* Block is big enough */
         {
+#if STRATEGY == BEST_FIT
             if (p->s.size == nunits) /* Perfect fit, stop looking*/
             {
                 if (prevp == NULL)              /* First in list */
@@ -353,6 +358,7 @@ void * malloc(size_t nbytes)
                 return (void *)(p+1);           /* Return memory block */
             }
             else /* Not perfect and not last, update opt_p */
+#endif /* STRATEGY == BEST_FIT */
             {
                 unsigned diff_opt, diff_p;
 
@@ -406,6 +412,8 @@ void * malloc(size_t nbytes)
         }
     }
 #endif
+    /* Something is wrong if this is executed */
+    return NULL;
 }
 
 /* realloc - Change size of memory previously allocated by malloc or realloc

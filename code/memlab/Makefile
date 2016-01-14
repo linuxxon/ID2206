@@ -1,47 +1,58 @@
-SRC	= malloc.h malloc.c tstalgorithms.c  tstcrash_complex.c tstcrash_simple.c \
-	  tstextreme.c tstmalloc.c  tstmemory.c tstrealloc.c tstmerge.o
+SRC	= malloc.h malloc.c tstalgorithms.c  \
+	  tstextreme.c tstmalloc.c  tstmemory.c tstrealloc.c tstmerge.o \
+	  best-case.c average-case.c worst-case.c test-env.h
 
-OBJ	= malloc.o tstalgorithms.o  tstcrash_simple.o\
-	  tstextreme.o tstmalloc.o  tstmemory.o tstrealloc.o tstmerge.o
+## Use STDMALLOC as to switch between standard malloc implementation and custom
+ifeq ($(STDMALLOC), true)
+MALLOC_OBJ = 
+else
+MALLOC_OBJ = malloc.o
+endif
+
+OBJ	= $(MALLOC_OBJ) tstalgorithms.o  tstcrash_simple.o\
+	  tstextreme.o tstmalloc.o  tstmemory.o tstrealloc.o tstmerge.o \
+	  best-case.o average-case.o worst-case.o
 
 BIN	= t0 t1 t2 t3 t4 t5
 
-STRATEGY ?= 0
+STRATEGY ?= 1
 STRAT = -DSTRATEGY=$(STRATEGY)
-CFLAGS	= -g -Wall -ansi $(STRAT)
+CFLAGS	= -Wall -ansi -O4 $(STRAT)
 
-XFLAGS	= -g -Wall $(STRAT)
-
-#CC	= gcc -ansi -pedantic -Wall -g -pipe -O -pg
 CC	= gcc 
 
+.PHONY: all clean cleanall $(BIN)
 
 all: $(BIN)
 	exec ./RUN_TESTS
 
-t0: tstmerge.o malloc.o $(X)
-	$(CC) $(CFLAGS) -o  $@ tstmerge.o malloc.o $(X)
+best-case: best-case.o $(MALLOC_OBJ)
+	$(CC) $(CFLAGS) -o $@ best-case.o $(MALLOC_OBJ)
 
-t1: tstalgorithms.o malloc.o $(X)
-	$(CC) $(CFLAGS) -o  $@ tstalgorithms.o malloc.o $(X)
+average-case: average-case.o $(MALLOC_OBJ)
+	$(CC) $(CFLAGS) -o $@ average-case.o $(MALLOC_OBJ)
 
-t2: tstextreme.o malloc.o $(X)
-	$(CC) $(CFLAGS) -o $@  tstextreme.o malloc.o $(X)
+worst-case: worst-case.o $(MALLOC_OBJ)
+	$(CC) $(CFLAGS) -o $@ worst-case.o $(MALLOC_OBJ)
 
-t3: tstmalloc.o  malloc.o $(X)
-	$(CC) $(CFLAGS) -o $@ tstmalloc.o  malloc.o $(X) 
+t0: tstmerge.o $(MALLOC_OBJ) $(X)
+	$(CC) $(CFLAGS) -o  $@ tstmerge.o $(MALLOC_OBJ) $(X)
 
-t4: tstmemory.o malloc.o $(X)
-	$(CC) $(CFLAGS) -o $@ tstmemory.o malloc.o $(X)
+t1: tstalgorithms.o $(MALLOC_OBJ) $(X)
+	$(CC) $(CFLAGS) -o  $@ tstalgorithms.o $(MALLOC_OBJ) $(X)
 
-t5: tstrealloc.o malloc.o $(X)
-	$(CC) $(CFLAGS) -o $@ tstrealloc.o malloc.o $(X)
+t2: tstextreme.o $(MALLOC_OBJ) $(X)
+	$(CC) $(CFLAGS) -o $@  tstextreme.o $(MALLOC_OBJ) $(X)
 
-t6: tstcrash_simple.o malloc.o $(X)
-	$(CC) $(CFLAGS) -o  $@ tstcrash_simple.o malloc.o $(X)
+t3: tst$(MALLOC_OBJ)  $(MALLOC_OBJ) $(X)
+	$(CC) $(CFLAGS) -o $@ tst$(MALLOC_OBJ)  $(MALLOC_OBJ) $(X) 
 
-t7: malloc.o $(X)
-	$(CC) $(XFLAGS) -o $@  tstcrash_complex.c malloc.o $(X) 
+t4: tstmemory.o $(MALLOC_OBJ) $(X)
+	$(CC) $(CFLAGS) -o $@ tstmemory.o $(MALLOC_OBJ) $(X)
+
+t5: tstrealloc.o $(MALLOC_OBJ) $(X)
+	$(CC) $(CFLAGS) -o $@ tstrealloc.o $(MALLOC_OBJ) $(X)
+
 
 clean:
 	\rm -f $(BIN) $(OBJ) core
