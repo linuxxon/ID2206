@@ -1,0 +1,319 @@
+\rm -f t0 t1 t2 t3 t4 t5 malloc.o tstalgorithms.o  tstcrash_simple.o tstextreme.o tstmalloc.o  tstmemory.o tstrealloc.o tstmerge.o best-case.o average-case.o worst-case.o core
+gcc  -Wall -ansi -O4 -DSTRATEGY=1   -c -o tstmerge.o tstmerge.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=1   -c -o malloc.o malloc.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=1 -o  t0 tstmerge.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=1   -c -o tstalgorithms.o tstalgorithms.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=1 -o  t1 tstalgorithms.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=1   -c -o tstextreme.o tstextreme.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=1 -o t2  tstextreme.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=1   -c -o tstmalloc.o tstmalloc.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=1 -o t3 tstmalloc.o  malloc.o  
+gcc  -Wall -ansi -O4 -DSTRATEGY=1   -c -o tstmemory.o tstmemory.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=1 -o t4 tstmemory.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=1   -c -o tstrealloc.o tstrealloc.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=1 -o t5 tstrealloc.o malloc.o 
+exec ./RUN_TESTS
+-- Testing your implementation of malloc --
+
+- If you have any problem in passing a test read the corresponding
+- source file to understand what the test is checking
+
+********************* TEST MERGE ... -- Testing merging of deallocated large blocks ( >= 16384 bytes)
+Test passed OK
+********************* TEST ALGORITHMS ... ./t1, line 69: -- This test checks malloc(), free() and realloc()
+./t1: Max memory allocated 12050560
+./t1: Memory consumed 47276032
+********************* TEST EXTREME USAGE ... ./t2, line 23: -- This test will search for memory leaks
+./t2, line 24: At most 4.0x pages are allocated and recycled
+./t2: Used memory in test: 0x4000 (= 4.00 * pagesize)
+********************* TEST MALLOC ... ./t3, line 19: -- Test malloc() for unusual situations
+./t3, line 21: Allocate small block of 17 bytes 
+./t3, line 25: Write on allocated block
+./t3, line 28: Allocate big block of 4711 bytes
+./t3, line 32: Write on allocated block
+./t3, line 34: Free big block
+./t3, line 37: Free small block
+./t3, line 40: Free NULL
+./t3, line 43: Allocate zero
+./t3, line 47: Free pointer from malloc(0)
+./t3, line 50: Test alignment for double
+********************* TEST MEMORY ... ./t4, line 32: Testing memory utility
+./t4, line 40: Getting small pieces of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using 2.00 times worst case calculation
+./t4, line 66: Small memory handled OK
+./t4, line 69: Getting big blocks of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4, line 88: Allocations versus worst case memory usage:
+./t4: Using 1.10 times worst case calculation
+./t4, line 96: Big memory handled OK
+********************* TEST REALLOC ... ./t5, line 17: -- Test realloc() for unusual situations
+./t5, line 19: Allocate 17 bytes with realloc(NULL, 17)
+./t5, line 24: Write on allocated block
+./t5, line 26: Increase block size with realloc(., 4711)
+./t5, line 33: Write on allocated block
+./t5, line 35: Decrease block size with realloc(., 17)
+./t5, line 40: Decreased block size
+./t5, line 43: Free block with realloc(., 0)
+./t5, line 48: realloc(p, 0) returns null pointer
+./t5, line 49: Free pointer allocated with realloc(NULL, 0)
+\rm -f t0 t1 t2 t3 t4 t5 malloc.o tstalgorithms.o  tstcrash_simple.o tstextreme.o tstmalloc.o  tstmemory.o tstrealloc.o tstmerge.o best-case.o average-case.o worst-case.o core
+gcc  -Wall -ansi -O4 -DSTRATEGY=2   -c -o tstmerge.o tstmerge.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=2   -c -o malloc.o malloc.c
+malloc.c: In function 'malloc':
+malloc.c:276: warning: 'opt_prev' may be used uninitialized in this function
+malloc.c: In function 'realloc':
+malloc.c:276: warning: 'opt_prev' may be used uninitialized in this function
+malloc.c:276: warning: 'opt_prev' may be used uninitialized in this function
+gcc  -Wall -ansi -O4 -DSTRATEGY=2 -o  t0 tstmerge.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=2   -c -o tstalgorithms.o tstalgorithms.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=2 -o  t1 tstalgorithms.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=2   -c -o tstextreme.o tstextreme.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=2 -o t2  tstextreme.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=2   -c -o tstmalloc.o tstmalloc.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=2 -o t3 tstmalloc.o  malloc.o  
+gcc  -Wall -ansi -O4 -DSTRATEGY=2   -c -o tstmemory.o tstmemory.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=2 -o t4 tstmemory.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=2   -c -o tstrealloc.o tstrealloc.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=2 -o t5 tstrealloc.o malloc.o 
+exec ./RUN_TESTS
+-- Testing your implementation of malloc --
+
+- If you have any problem in passing a test read the corresponding
+- source file to understand what the test is checking
+
+********************* TEST MERGE ... -- Testing merging of deallocated large blocks ( >= 16384 bytes)
+Test passed OK
+********************* TEST ALGORITHMS ... ./t1, line 69: -- This test checks malloc(), free() and realloc()
+./t1: Max memory allocated 12023752
+./t1: Memory consumed 45256704
+********************* TEST EXTREME USAGE ... ./t2, line 23: -- This test will search for memory leaks
+./t2, line 24: At most 4.0x pages are allocated and recycled
+./t2: Used memory in test: 0x4000 (= 4.00 * pagesize)
+********************* TEST MALLOC ... ./t3, line 19: -- Test malloc() for unusual situations
+./t3, line 21: Allocate small block of 17 bytes 
+./t3, line 25: Write on allocated block
+./t3, line 28: Allocate big block of 4711 bytes
+./t3, line 32: Write on allocated block
+./t3, line 34: Free big block
+./t3, line 37: Free small block
+./t3, line 40: Free NULL
+./t3, line 43: Allocate zero
+./t3, line 47: Free pointer from malloc(0)
+./t3, line 50: Test alignment for double
+********************* TEST MEMORY ... ./t4, line 32: Testing memory utility
+./t4, line 40: Getting small pieces of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using 2.00 times worst case calculation
+./t4, line 66: Small memory handled OK
+./t4, line 69: Getting big blocks of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4, line 88: Allocations versus worst case memory usage:
+./t4: Using 1.10 times worst case calculation
+./t4, line 96: Big memory handled OK
+********************* TEST REALLOC ... ./t5, line 17: -- Test realloc() for unusual situations
+./t5, line 19: Allocate 17 bytes with realloc(NULL, 17)
+./t5, line 24: Write on allocated block
+./t5, line 26: Increase block size with realloc(., 4711)
+./t5, line 33: Write on allocated block
+./t5, line 35: Decrease block size with realloc(., 17)
+./t5, line 40: Decreased block size
+./t5, line 43: Free block with realloc(., 0)
+./t5, line 48: realloc(p, 0) returns null pointer
+./t5, line 49: Free pointer allocated with realloc(NULL, 0)
+\rm -f t0 t1 t2 t3 t4 t5 malloc.o tstalgorithms.o  tstcrash_simple.o tstextreme.o tstmalloc.o  tstmemory.o tstrealloc.o tstmerge.o best-case.o average-case.o worst-case.o core
+gcc  -Wall -ansi -O4 -DSTRATEGY=3   -c -o tstmerge.o tstmerge.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=3   -c -o malloc.o malloc.c
+malloc.c: In function 'malloc':
+malloc.c:276: warning: 'opt_prev' may be used uninitialized in this function
+malloc.c: In function 'realloc':
+malloc.c:276: warning: 'opt_prev' may be used uninitialized in this function
+malloc.c:276: warning: 'opt_prev' may be used uninitialized in this function
+gcc  -Wall -ansi -O4 -DSTRATEGY=3 -o  t0 tstmerge.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=3   -c -o tstalgorithms.o tstalgorithms.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=3 -o  t1 tstalgorithms.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=3   -c -o tstextreme.o tstextreme.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=3 -o t2  tstextreme.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=3   -c -o tstmalloc.o tstmalloc.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=3 -o t3 tstmalloc.o  malloc.o  
+gcc  -Wall -ansi -O4 -DSTRATEGY=3   -c -o tstmemory.o tstmemory.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=3 -o t4 tstmemory.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=3   -c -o tstrealloc.o tstrealloc.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=3 -o t5 tstrealloc.o malloc.o 
+exec ./RUN_TESTS
+-- Testing your implementation of malloc --
+
+- If you have any problem in passing a test read the corresponding
+- source file to understand what the test is checking
+
+********************* TEST MERGE ... -- Testing merging of deallocated large blocks ( >= 16384 bytes)
+Test passed OK
+********************* TEST ALGORITHMS ... ./t1, line 69: -- This test checks malloc(), free() and realloc()
+./t1: Max memory allocated 11970480
+./t1: Memory consumed 54435840
+********************* TEST EXTREME USAGE ... ./t2, line 23: -- This test will search for memory leaks
+./t2, line 24: At most 4.0x pages are allocated and recycled
+./t2: Used memory in test: 0x4000 (= 4.00 * pagesize)
+********************* TEST MALLOC ... ./t3, line 19: -- Test malloc() for unusual situations
+./t3, line 21: Allocate small block of 17 bytes 
+./t3, line 25: Write on allocated block
+./t3, line 28: Allocate big block of 4711 bytes
+./t3, line 32: Write on allocated block
+./t3, line 34: Free big block
+./t3, line 37: Free small block
+./t3, line 40: Free NULL
+./t3, line 43: Allocate zero
+./t3, line 47: Free pointer from malloc(0)
+./t3, line 50: Test alignment for double
+********************* TEST MEMORY ... ./t4, line 32: Testing memory utility
+./t4, line 40: Getting small pieces of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using 2.00 times worst case calculation
+./t4, line 66: Small memory handled OK
+./t4, line 69: Getting big blocks of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4, line 88: Allocations versus worst case memory usage:
+./t4: Using 1.10 times worst case calculation
+./t4, line 96: Big memory handled OK
+********************* TEST REALLOC ... ./t5, line 17: -- Test realloc() for unusual situations
+./t5, line 19: Allocate 17 bytes with realloc(NULL, 17)
+./t5, line 24: Write on allocated block
+./t5, line 26: Increase block size with realloc(., 4711)
+./t5, line 33: Write on allocated block
+./t5, line 35: Decrease block size with realloc(., 17)
+./t5, line 40: Decreased block size
+./t5, line 43: Free block with realloc(., 0)
+./t5, line 48: realloc(p, 0) returns null pointer
+./t5, line 49: Free pointer allocated with realloc(NULL, 0)
+\rm -f t0 t1 t2 t3 t4 t5 malloc.o tstalgorithms.o  tstcrash_simple.o tstextreme.o tstmalloc.o  tstmemory.o tstrealloc.o tstmerge.o best-case.o average-case.o worst-case.o core
+gcc  -Wall -ansi -O4 -DSTRATEGY=4   -c -o tstmerge.o tstmerge.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=4   -c -o malloc.o malloc.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=4 -o  t0 tstmerge.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=4   -c -o tstalgorithms.o tstalgorithms.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=4 -o  t1 tstalgorithms.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=4   -c -o tstextreme.o tstextreme.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=4 -o t2  tstextreme.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=4   -c -o tstmalloc.o tstmalloc.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=4 -o t3 tstmalloc.o  malloc.o  
+gcc  -Wall -ansi -O4 -DSTRATEGY=4   -c -o tstmemory.o tstmemory.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=4 -o t4 tstmemory.o malloc.o 
+gcc  -Wall -ansi -O4 -DSTRATEGY=4   -c -o tstrealloc.o tstrealloc.c
+gcc  -Wall -ansi -O4 -DSTRATEGY=4 -o t5 tstrealloc.o malloc.o 
+exec ./RUN_TESTS
+-- Testing your implementation of malloc --
+
+- If you have any problem in passing a test read the corresponding
+- source file to understand what the test is checking
+
+********************* TEST MERGE ... -- Testing merging of deallocated large blocks ( >= 16384 bytes)
+Test passed OK
+********************* TEST ALGORITHMS ... ./t1, line 69: -- This test checks malloc(), free() and realloc()
+./t1: Max memory allocated 11906680
+./t1: Memory consumed 48070656
+********************* TEST EXTREME USAGE ... ./t2, line 23: -- This test will search for memory leaks
+./t2, line 24: At most 4.0x pages are allocated and recycled
+./t2: Used memory in test: 0x8000 (= 8.00 * pagesize)
+./t2, line 53: * ERROR: This malloc has a memory leak
+********************* TEST MALLOC ... ./t3, line 19: -- Test malloc() for unusual situations
+./t3, line 21: Allocate small block of 17 bytes 
+./t3, line 25: Write on allocated block
+./t3, line 28: Allocate big block of 4711 bytes
+./t3, line 32: Write on allocated block
+./t3, line 34: Free big block
+./t3, line 37: Free small block
+./t3, line 40: Free NULL
+./t3, line 43: Allocate zero
+./t3, line 47: Free pointer from malloc(0)
+./t3, line 50: Test alignment for double
+********************* TEST MEMORY ... ./t4, line 32: Testing memory utility
+./t4, line 40: Getting small pieces of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using total of 0x4000 of memory
+./t4: Using 2.00 times worst case calculation
+./t4, line 66: Small memory handled OK
+./t4, line 69: Getting big blocks of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4: Using total of 0x450000 of memory
+./t4, line 88: Allocations versus worst case memory usage:
+./t4: Using 1.10 times worst case calculation
+./t4, line 96: Big memory handled OK
+********************* TEST REALLOC ... ./t5, line 17: -- Test realloc() for unusual situations
+./t5, line 19: Allocate 17 bytes with realloc(NULL, 17)
+./t5, line 24: Write on allocated block
+./t5, line 26: Increase block size with realloc(., 4711)
+./t5, line 33: Write on allocated block
+./t5, line 35: Decrease block size with realloc(., 17)
+./t5, line 40: Decreased block size
+./t5, line 43: Free block with realloc(., 0)
+./t5, line 48: realloc(p, 0) returns null pointer
+./t5, line 49: Free pointer allocated with realloc(NULL, 0)
